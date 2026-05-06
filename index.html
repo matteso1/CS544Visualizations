@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS 544 — Visualizations of Distributed Data Systems</title>
+  <meta name="description" content="Interactive visualizations of the distributed data systems taught in UW–Madison CS 544: Cassandra rings, Kafka partitioning, HDFS pipelined writes, and HBase regions." />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <main class="page">
+
+    <header class="masthead">
+      <div>
+        <div class="masthead__meta">UW–Madison · CS 544 · spring 2026</div>
+        <div class="masthead__title"><a href="./index.html">Visualizing Distributed Data Systems</a></div>
+      </div>
+      <nav class="masthead__nav">
+        <a href="./cassandra.html">Cassandra</a>
+        <a href="./kafka.html">Kafka</a>
+        <a href="./hdfs.html">HDFS</a>
+        <a href="./hbase.html">HBase</a>
+      </nav>
+    </header>
+
+    <div class="eyebrow">Volume I · Storage and movement</div>
+    <h1 class="title">A small atlas of the moving parts behind <em>distributed</em> data.</h1>
+    <p class="lede">
+      The systems in CS 544 are easy to draw on a chalkboard and hard to
+      hold in your head all at once. This is a quiet attempt at the
+      opposite — diagrams you can poke at, with a few sliders and a lot
+      of restraint.
+    </p>
+
+    <h2><span class="num">§ 1</span>The premise</h2>
+    <p>
+      Most explanations of Cassandra rings, Kafka partitions, and HDFS
+      writes are static — a single diagram, frozen in one configuration.
+      But the questions a student actually has are dynamic: <em>what
+      happens when I change the replication factor?</em>; <em>what
+      happens when two messages share a key?</em>; <em>where do the
+      bytes flow if a DataNode goes down?</em>
+    </p>
+    <p>
+      Each page below is a single, focused interactive figure that
+      answers one of those questions. Drag a key around the Cassandra
+      ring and watch the replicas update. Send a message into a Kafka
+      topic and watch which partition it lands on. Push a file into
+      HDFS and watch the bytes flow.
+    </p>
+    <p>
+      No telemetry. No build step. Just SVG and a little JavaScript.
+    </p>
+
+    <h2><span class="num">§ 2</span>The figures</h2>
+
+    <div class="cards">
+
+      <a class="card" href="./cassandra.html">
+        <span class="card__num">Figure I</span>
+        <span class="card__title">The Cassandra ring</span>
+        <span class="card__desc">
+          Drag a key around a token ring. Watch which vnode owns it,
+          where the replicas land, and whether your read and write
+          consistency levels add up to strong consistency.
+        </span>
+        <span class="card__cta">Open figure →</span>
+      </a>
+
+      <a class="card" href="./kafka.html">
+        <span class="card__num">Figure II</span>
+        <span class="card__title">A Kafka topic, partitioned</span>
+        <span class="card__desc">
+          Produce keyed and unkeyed messages into a topic. See where
+          each one lands, watch consumer groups draw their share, and
+          discover why ordering only holds inside a single partition.
+        </span>
+        <span class="card__cta">Open figure →</span>
+      </a>
+
+      <a class="card" href="./hdfs.html">
+        <span class="card__num">Figure III</span>
+        <span class="card__title">HDFS, by the byte</span>
+        <span class="card__desc">
+          Push a file of size <span class="mono">F</span> into a small
+          cluster. See the pipelined write travel DataNode to
+          DataNode, and watch the byte counters answer the exam
+          question: how much network, how much disk?
+        </span>
+        <span class="card__cta">Open figure →</span>
+      </a>
+
+      <a class="card" href="./hbase.html">
+        <span class="card__num">Figure IV</span>
+        <span class="card__title">HBase regions on a row line</span>
+        <span class="card__desc">
+          Watch a sorted row-key space split into regions, each owned
+          by exactly one RegionServer. Add rows, force a split, kill a
+          server, and see the region reassign.
+        </span>
+        <span class="card__cta">Open figure →</span>
+      </a>
+
+    </div>
+
+    <h2><span class="num">§ 3</span>How to read the figures</h2>
+    <p>
+      Each page is structured the same way. A short paragraph in
+      plain English. The figure itself, with the controls underneath
+      it. A readout strip that updates as you change things. A caption
+      that points out what to notice. And, beneath it all, a short
+      <em>“the rules”</em> section that distills the figure into the
+      one or two facts that are most likely to be tested.
+    </p>
+    <p>
+      The figures are not simulations of real clusters. They are
+      faithful to the algorithms — Cassandra’s ring walk really does
+      go clockwise; Kafka really does hash <span class="mono">key % n</span>;
+      HDFS really does pipeline — but the numbers and timings are
+      schematic.
+    </p>
+
+    <h2><span class="num">§ 4</span>Colophon</h2>
+    <p>
+      Built by <a class="intext" href="https://github.com/matteso1">Nils Matteson</a>,
+      a CS 544 student in spring 2026, mostly as a way to study for the
+      final by building the diagrams I wished I had been studying from.
+      With thanks to <strong>Tyler Caraza-Harter</strong>, whose
+      lectures and exam questions are the source material for nearly
+      every interaction here.
+    </p>
+    <p>
+      Set in <em>EB Garamond</em> and <em>JetBrains Mono</em>. Source
+      and issues at
+      <a class="intext" href="https://github.com/matteso1/CS544Visualizations">
+        github.com/matteso1/CS544Visualizations
+      </a>.
+    </p>
+
+    <footer class="colophon">
+      <span>© 2026 · Nils Matteson</span>
+      <span>UW–Madison · CS 544 · s26</span>
+    </footer>
+
+  </main>
+</body>
+</html>

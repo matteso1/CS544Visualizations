@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HDFS, by the byte — CS 544 Visualizations</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <main class="page page--wide">
+
+    <header class="masthead">
+      <div>
+        <div class="masthead__meta">UW–Madison · CS 544 · spring 2026</div>
+        <div class="masthead__title"><a href="./index.html">Visualizing Distributed Data Systems</a></div>
+      </div>
+      <nav class="masthead__nav">
+        <a href="./cassandra.html">Cassandra</a>
+        <a href="./kafka.html">Kafka</a>
+        <a href="./hdfs.html" class="is-current">HDFS</a>
+        <a href="./hbase.html">HBase</a>
+      </nav>
+    </header>
+
+    <div class="eyebrow">Figure III · Pipelined writes and the byte ledger</div>
+    <h1 class="title">HDFS, <em>by the byte</em>.</h1>
+    <p class="lede">
+      The HDFS exam question is almost always the same: a file of size
+      F, a replication factor of R — how much network and how much
+      disk does the cluster pay? The answer falls out of one design
+      choice: <em>pipelining</em>.
+    </p>
+
+    <p>
+      A naive design would have the client send the whole file
+      <span class="mono">R</span> times — once to each replica. HDFS
+      doesn’t. The client sends the file <em>once</em>, to the first
+      DataNode chosen by the NameNode. That DataNode forwards the
+      bytes to the second, which forwards them to the third. The
+      bytes flow through a <strong>pipeline</strong>, and the client
+      pays the network cost only of the first hop.
+    </p>
+
+    <p>
+      Set the file size and replication factor below and press
+      <em>Write</em>. Watch the bytes cross the wire from the client
+      to the first DataNode, then propagate down the pipeline. Watch
+      the byte counters fill in. The numbers are the same numbers
+      Tyler asks about on the exam.
+    </p>
+
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure III.1</span>
+        <span class="figure__title">A client writes a file to a five-DataNode cluster</span>
+      </div>
+      <div class="figure__body" id="hdfs-stage">
+        <svg id="hdfs-svg" viewBox="0 0 920 460" role="img" aria-label="HDFS pipelined write">
+          <!-- NameNode -->
+          <g>
+            <rect x="380" y="20" width="160" height="48" class="fill-paper stroke-ink" stroke-width="1.5" />
+            <text x="460" y="40" text-anchor="middle" class="label-lg">NameNode</text>
+            <text x="460" y="58" text-anchor="middle" class="label-sm">block placement</text>
+          </g>
+
+          <!-- Client -->
+          <g>
+            <rect x="40" y="220" width="120" height="60" class="fill-paper stroke-ink" stroke-width="1.5" />
+            <text x="100" y="246" text-anchor="middle" class="label-lg">client</text>
+            <text x="100" y="266" text-anchor="middle" class="label-sm">writes F bytes once</text>
+          </g>
+
+          <!-- arrow markers -->
+          <defs>
+            <marker id="arrow-ink2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a1814" />
+            </marker>
+            <marker id="arrow-ox2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b1f0e" />
+            </marker>
+          </defs>
+
+          <!-- DataNodes (drawn by JS) -->
+          <g id="dn-g"></g>
+
+          <!-- pipeline lines (drawn by JS) -->
+          <g id="pipe-g"></g>
+
+          <!-- moving bytes (drawn by JS) -->
+          <g id="bytes-g"></g>
+
+          <!-- inert NN→client metadata response -->
+          <line x1="460" y1="68" x2="160" y2="225" stroke="#46566a" stroke-width="0.8" stroke-dasharray="2 4" />
+          <text x="270" y="155" class="label-sm" fill="#46566a">block placement (which DNs)</text>
+        </svg>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">File size F (MB)</span>
+          <input type="range" id="f-size" min="32" max="512" step="32" value="128" />
+          <span class="control__value"><span id="f-size-val">128</span> MB</span>
+        </div>
+        <div class="control">
+          <span class="control__label">Replication factor R</span>
+          <input type="range" id="rf" min="1" max="5" value="3" />
+          <span class="control__value"><span id="rf-val">3</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-write">Write →</button>
+            <button class="btn" id="btn-read">Read ←</button>
+            <button class="btn" id="btn-reset">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <figcaption class="figure__caption">
+        <b>Read this:</b> the thick line that lights up first is the
+        client → DataNode 1 hop — the only network the client pays
+        for. The next two lines are the pipeline, between DataNodes,
+        invisible to the client. The byte counter shows
+        <span class="mono">F × R</span> on the cluster network because
+        each replica still costs one cross-node hop.
+      </figcaption>
+    </figure>
+
+    <div class="readout">
+      <div class="readout__cell">
+        <span class="k">Client → cluster</span>
+        <span class="v" id="r-client">— MB</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Cluster network</span>
+        <span class="v" id="r-net">— MB</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Cluster disk</span>
+        <span class="v" id="r-disk">— MB</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Read network</span>
+        <span class="v" id="r-read">— MB</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Total</span>
+        <span class="v" id="r-total">— MB</span>
+      </div>
+    </div>
+
+    <h2><span class="num">§ III.1</span>What just happened</h2>
+
+    <h3>The client only sees one DataNode</h3>
+    <p>
+      No matter how big <span class="mono">R</span> is, the client
+      uploads <span class="mono">F</span> bytes <em>once</em>. The
+      NameNode tells the client which DataNode to use; the client
+      streams the file to that DataNode and walks away. The client’s
+      bandwidth bill is <span class="mono">F</span>, full stop.
+    </p>
+
+    <h3>The pipeline pays one hop per replica</h3>
+    <p>
+      DataNode 1 forwards the bytes to DataNode 2 as it receives
+      them; DataNode 2 forwards to DataNode 3; and so on. That’s
+      <span class="mono">R</span> hops over the cluster network — one
+      from the client to DN 1, and then <span class="mono">R − 1</span>
+      between DataNodes. <strong>Total cluster network = F × R.</strong>
+    </p>
+
+    <h3>Disk costs scale with R, too</h3>
+    <p>
+      Each of the <span class="mono">R</span> DataNodes writes the
+      bytes to its local disk. <strong>Total cluster disk = F × R.</strong>
+      This is the single biggest reason replication is expensive —
+      not the network, but the storage.
+    </p>
+
+    <h3>Reads only pay F</h3>
+    <p>
+      To read the file the client only needs <em>one</em> replica.
+      The NameNode points the client at the closest DataNode that
+      holds it. <strong>Read network = F.</strong>
+      And so the all-in
+      cost of writing then reading once is
+      <strong>F × (R + 1)</strong> on the cluster network.
+    </p>
+
+    <h3>Smaller blocks, better balance</h3>
+    <p>
+      HDFS splits a file into 128 MB blocks (the default) and chooses
+      placement <em>per block</em>. The math above holds for each
+      block. Smaller blocks let the NameNode spread load more evenly,
+      at the cost of more metadata it has to track in RAM.
+    </p>
+
+    <hr class="hr-double" />
+
+    <h2><span class="num">§ III.2</span>The rules to remember</h2>
+    <pre><code>client uploads     : F                  (independent of R)
+cluster network    : F × R              (one hop per replica)
+cluster disk       : F × R              (each replica writes once)
+read network       : F                  (one replica is enough)
+write + 1 read     : F × (R + 1)
+default block size : 128 MB
+default R          : 3</code></pre>
+
+    <p style="margin-top: 36px;">
+      <a class="intext" href="./kafka.html">← previous figure: a Kafka topic, partitioned</a>
+      &nbsp;·&nbsp;
+      <a class="intext" href="./hbase.html">next figure: HBase regions on a row line →</a>
+    </p>
+
+    <footer class="colophon">
+      <span>© 2026 · Nils Matteson</span>
+      <span>Figure III · HDFS</span>
+    </footer>
+
+  </main>
+
+  <script src="scripts/hdfs-pipeline.js"></script>
+</body>
+</html>

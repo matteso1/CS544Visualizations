@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A Kafka topic, partitioned — CS 544 Visualizations</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <main class="page page--wide">
+
+    <header class="masthead">
+      <div>
+        <div class="masthead__meta">UW–Madison · CS 544 · spring 2026</div>
+        <div class="masthead__title"><a href="./index.html">Visualizing Distributed Data Systems</a></div>
+      </div>
+      <nav class="masthead__nav">
+        <a href="./cassandra.html">Cassandra</a>
+        <a href="./kafka.html" class="is-current">Kafka</a>
+        <a href="./hdfs.html">HDFS</a>
+        <a href="./hbase.html">HBase</a>
+      </nav>
+    </header>
+
+    <div class="eyebrow">Figure II · Partitions, keys, and consumer groups</div>
+    <h1 class="title">A Kafka topic, <em>partitioned</em>.</h1>
+    <p class="lede">
+      Kafka does not promise ordering across a topic — it promises
+      ordering inside a partition. Everything else about how Kafka
+      scales follows from that one decision.
+    </p>
+
+    <p>
+      A topic is split into <strong>partitions</strong>. A producer
+      sends a message; if the message has a key, Kafka picks the
+      partition by hashing the key
+      (<span class="mono">hash(key) mod n</span>); if it has no key,
+      Kafka round-robins. The producer cannot pick a partition
+      cleverly — only the key controls placement.
+    </p>
+
+    <p>
+      Each <strong>consumer group</strong> reads the topic
+      independently. Inside a group, each partition is assigned to
+      <em>exactly one</em> consumer at a time. Add more groups and
+      every group sees every message; add more consumers within a
+      group and you spread the work — up to the number of partitions,
+      after which the extras sit idle.
+    </p>
+
+    <p>
+      Type a key below, send some messages, and watch where they
+      land. Toggle the keyed switch off to see round-robin. Add a
+      second consumer group and watch fan-out. Add another consumer
+      to <em>group α</em> and watch the partitions get reassigned.
+    </p>
+
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure II.1</span>
+        <span class="figure__title">A topic with four partitions and two consumer groups</span>
+      </div>
+      <div class="figure__body" id="kafka-stage">
+        <svg id="kafka-svg" viewBox="0 0 920 500" role="img" aria-label="Kafka topic with partitions and consumer groups">
+          <!-- producer -->
+          <g id="producer-g">
+            <rect x="20" y="220" width="120" height="60" class="fill-paper stroke-ink" stroke-width="1.5" />
+            <text x="80" y="246" text-anchor="middle" class="label-lg">producer</text>
+            <text x="80" y="266" text-anchor="middle" class="label-sm">.send(key, value)</text>
+          </g>
+
+          <!-- arrow producer → topic -->
+          <line x1="140" y1="250" x2="240" y2="250" class="stroke-ink" stroke-width="1.2" marker-end="url(#arrow-ink)" />
+
+          <!-- topic frame -->
+          <g>
+            <rect x="245" y="80" width="380" height="380" class="fill-paper stroke-ink" stroke-width="1.5" stroke-dasharray="3 4" />
+            <text x="435" y="68" text-anchor="middle" class="label-lg">topic <tspan font-style="normal" font-family="JetBrains Mono, monospace" font-size="13">orders</tspan></text>
+          </g>
+
+          <!-- partitions container (filled in by JS) -->
+          <g id="partitions-g"></g>
+
+          <!-- consumer groups (filled in by JS) -->
+          <g id="groups-g"></g>
+
+          <!-- arrow markers -->
+          <defs>
+            <marker id="arrow-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a1814" />
+            </marker>
+            <marker id="arrow-ox" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b1f0e" />
+            </marker>
+          </defs>
+
+          <!-- floating message animations (filled in by JS) -->
+          <g id="msg-flight"></g>
+        </svg>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Message key</span>
+          <input type="text" id="msg-key" value="user-42" maxlength="20"
+                 style="font-family: var(--mono); font-size: 13px; border: 1px solid var(--ink); background: var(--paper); padding: 6px 8px; border-radius: 0;" />
+        </div>
+        <div class="control">
+          <span class="control__label">Use key?</span>
+          <label style="display:flex; gap:8px; align-items:center;">
+            <input type="checkbox" id="use-key" checked />
+            <span class="control__value" id="use-key-val">keyed</span>
+          </label>
+        </div>
+        <div class="control">
+          <span class="control__label">Partitions</span>
+          <input type="range" id="num-parts" min="2" max="6" value="4" />
+          <span class="control__value"><span id="num-parts-val">4</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Group α consumers</span>
+          <input type="range" id="alpha-c" min="1" max="6" value="2" />
+          <span class="control__value"><span id="alpha-c-val">2</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Group β consumers</span>
+          <input type="range" id="beta-c" min="0" max="6" value="1" />
+          <span class="control__value"><span id="beta-c-val">1</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-send">Send →</button>
+            <button class="btn" id="btn-burst">Send 5 random keys</button>
+          </div>
+        </div>
+      </div>
+
+      <figcaption class="figure__caption">
+        <b>Read this:</b> the producer flings each message into
+        whichever partition the key hashes to. Inside a consumer
+        group, each partition pipes to exactly one consumer; idle
+        consumers (more consumers than partitions) sit empty.
+        Different groups consume the same messages independently.
+      </figcaption>
+    </figure>
+
+    <div class="readout">
+      <div class="readout__cell">
+        <span class="k">Last key</span>
+        <span class="v" id="rk-key">—</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Hash mod n</span>
+        <span class="v" id="rk-hash">—</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Landed in partition</span>
+        <span class="v" id="rk-part">—</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Total messages</span>
+        <span class="v" id="rk-count">0</span>
+      </div>
+    </div>
+
+    <h2><span class="num">§ II.1</span>What just happened</h2>
+
+    <h3>Same key always lands in the same partition</h3>
+    <p>
+      Type the same key twice and watch — the message lands in the
+      same partition both times. That is the foundation of Kafka’s
+      ordering guarantee: within a single partition, messages are
+      strictly ordered. So all messages with the same key are
+      guaranteed to be delivered in order. Across partitions there is
+      no ordering at all.
+    </p>
+
+    <h3>No key means round-robin</h3>
+    <p>
+      Turn off the <em>keyed</em> toggle and the producer
+      round-robins messages across partitions. This maximises load
+      balancing but throws ordering away — you cannot say which
+      message arrived first if they ended up in different partitions.
+    </p>
+
+    <h3>One consumer per partition, per group</h3>
+    <p>
+      Move the <em>group α consumers</em> slider. With fewer
+      consumers than partitions, some consumers are assigned multiple
+      partitions; with more, the extras are idle. The maximum useful
+      parallelism in a group is the number of partitions.
+    </p>
+
+    <h3>Adding a group is fan-out, not load balancing</h3>
+    <p>
+      Group β does not steal messages from group α. Both groups see
+      every message in the topic. This is how Kafka acts as a
+      durable bus: many independent applications consume the same
+      stream.
+    </p>
+
+    <h3>Adding partitions later breaks per-key order</h3>
+    <p>
+      Increase the partition count after sending some messages. New
+      messages with the same key may now hash to a different
+      partition than before — the per-key ordering guarantee was
+      tied to the partition assignment, and the assignment changed.
+      This is why production Kafka topics rarely add partitions.
+    </p>
+
+    <hr class="hr-double" />
+
+    <h2><span class="num">§ II.2</span>The rules to remember</h2>
+    <pre><code>partition       : hash(key) mod n        (or round-robin if no key)
+order           : guaranteed within a partition only
+group           : one consumer per partition, extras idle
+fan-out         : every group sees every message
+add a partition : breaks per-key ordering for affected keys
+durable triple  : acks=all + min.insync.replicas=2 + RF=3</code></pre>
+
+    <p style="margin-top: 36px;">
+      <a class="intext" href="./cassandra.html">← previous figure: the Cassandra ring</a>
+      &nbsp;·&nbsp;
+      <a class="intext" href="./hdfs.html">next figure: HDFS, by the byte →</a>
+    </p>
+
+    <footer class="colophon">
+      <span>© 2026 · Nils Matteson</span>
+      <span>Figure II · Kafka</span>
+    </footer>
+
+  </main>
+
+  <script src="scripts/kafka-partitions.js"></script>
+</body>
+</html>

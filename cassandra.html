@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Cassandra ring — CS 544 Visualizations</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <main class="page page--wide">
+
+    <header class="masthead">
+      <div>
+        <div class="masthead__meta">UW–Madison · CS 544 · spring 2026</div>
+        <div class="masthead__title"><a href="./index.html">Visualizing Distributed Data Systems</a></div>
+      </div>
+      <nav class="masthead__nav">
+        <a href="./cassandra.html" class="is-current">Cassandra</a>
+        <a href="./kafka.html">Kafka</a>
+        <a href="./hdfs.html">HDFS</a>
+        <a href="./hbase.html">HBase</a>
+      </nav>
+    </header>
+
+    <div class="eyebrow">Figure I · Replication and the ring walk</div>
+    <h1 class="title">The Cassandra <em>ring</em>.</h1>
+    <p class="lede">
+      Every key in a Cassandra cluster lives in exactly one place — at
+      first. The ring decides where, and the replication factor decides
+      how many <em>more</em> places it should also live.
+    </p>
+
+    <p>
+      A Cassandra cluster is laid out as a <strong>token ring</strong>.
+      Each physical node owns a number of <strong>vnodes</strong>
+      (virtual nodes), and each vnode is assigned a <strong>token</strong> —
+      a point on the ring. When a row is written, its
+      <strong>partition key</strong> is hashed to produce a token, and
+      the row is sent to the first vnode whose token is greater than
+      or equal to the key’s token, walking <em>clockwise</em>. That
+      vnode’s node is the <strong>primary replica</strong>. The next
+      <span class="mono">RF − 1</span> distinct nodes clockwise hold
+      additional replicas.
+    </p>
+
+    <p>
+      Drag the dark mark around the ring below — or click anywhere on
+      the ring — to move the key. Watch the owner update. Change the
+      replication factor and watch the replica set grow or shrink.
+      Change the read and write consistency levels and watch the
+      <em>strong consistency</em> light come on or go off.
+    </p>
+
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.1</span>
+        <span class="figure__title">A Cassandra ring with eight vnodes</span>
+      </div>
+      <div class="figure__body" id="ring-stage">
+        <svg id="ring-svg" viewBox="0 0 720 520" role="img" aria-label="Cassandra ring with draggable key">
+          <!-- ring -->
+          <g id="ring-g">
+            <circle cx="360" cy="260" r="200" class="stroke-ink fill-paper" stroke-width="1.2" />
+            <circle cx="360" cy="260" r="180" class="stroke-mute fill-paper" stroke-width="0.6" stroke-dasharray="2 4" />
+            <text x="360" y="50" text-anchor="middle" class="label-sm">TOKEN  0  ·  256</text>
+          </g>
+          <g id="ring-vnodes"></g>
+          <g id="ring-arc"></g>
+          <g id="ring-replicas"></g>
+          <g id="ring-key">
+            <line id="key-radial" x1="360" y1="260" x2="360" y2="40" stroke-width="1" stroke-dasharray="3 3" class="stroke-mute" />
+            <circle id="key-handle" cx="360" cy="60" r="10" class="fill-ink" stroke="var(--paper)" stroke-width="2" style="cursor: grab;" />
+            <text id="key-label" x="360" y="28" text-anchor="middle" class="label-lg">key  hash = 0</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Replication factor (RF)</span>
+          <input type="range" id="rf" min="1" max="5" value="3" />
+          <span class="control__value"><span id="rf-val">3</span> replica<span id="rf-s">s</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Read CL (R)</span>
+          <select id="cl-r">
+            <option value="1">ONE (1)</option>
+            <option value="2" selected>QUORUM (auto)</option>
+            <option value="rf">ALL (RF)</option>
+          </select>
+        </div>
+        <div class="control">
+          <span class="control__label">Write CL (W)</span>
+          <select id="cl-w">
+            <option value="1">ONE (1)</option>
+            <option value="2" selected>QUORUM (auto)</option>
+            <option value="rf">ALL (RF)</option>
+          </select>
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <button class="btn btn--accent" id="btn-pulse">Pulse the walk →</button>
+        </div>
+      </div>
+
+      <figcaption class="figure__caption">
+        <b>Read this:</b> the dark dot is the key. The shaded arc shows
+        the <em>walk</em> from the key’s position, clockwise, until it
+        meets the first vnode. That vnode is the <em>primary replica</em>.
+        The numbered vnodes that follow it are the
+        additional replicas; the count is the replication factor.
+      </figcaption>
+    </figure>
+
+    <div class="readout">
+      <div class="readout__cell">
+        <span class="k">Key token</span>
+        <span class="v" id="r-token">0</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Owner vnode</span>
+        <span class="v" id="r-owner">v1@A</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Replica nodes</span>
+        <span class="v" id="r-replicas">A · B · C</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">QUORUM</span>
+        <span class="v" id="r-quorum">2</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">R + W &gt; RF ?</span>
+        <span class="v v--ok" id="r-strong">strong</span>
+      </div>
+    </div>
+
+    <h2><span class="num">§ I.1</span>What just happened</h2>
+    <p>
+      The cluster has <strong>four physical nodes</strong>
+      (<span class="mono">A, B, C, D</span>) and <strong>eight vnodes</strong>
+      arranged around the ring. When you drag the key, its
+      hash-token changes; the figure walks <em>clockwise</em> from that
+      token until it meets a vnode. The first <em>RF distinct nodes</em>
+      it touches — skipping additional vnodes that belong to a node it
+      has already counted — become the replica set.
+    </p>
+
+    <h3>The walk is always clockwise</h3>
+    <p>
+      The single most common exam mistake is walking the wrong way. The
+      ring is ordered by increasing token, so the next vnode after a
+      key is always the one with the smallest token that is still
+      <em>≥</em> the key’s token. Walk counter-clockwise and you will
+      get a different owner every time.
+    </p>
+
+    <h3>Replicas count <em>distinct nodes</em>, not vnodes</h3>
+    <p>
+      If two adjacent vnodes belong to the same node, they count as one
+      replica. The walk simply continues past the duplicate. This is
+      why a cluster needs <span class="mono">RF</span> distinct
+      physical nodes to satisfy any RF; a 3-node cluster cannot
+      provide RF = 5.
+    </p>
+
+    <h3>Quorum is a function of RF only</h3>
+    <p>
+      <span class="mono">QUORUM = ⌊RF ÷ 2⌋ + 1</span>. So for RF = 3,
+      quorum is 2; for RF = 5, quorum is 3; for RF = 6, quorum is 4
+      (a frequent trap — half of 6 is 3, but the quorum is one more
+      than half).
+    </p>
+
+    <h3>R + W &gt; RF means strong consistency</h3>
+    <p>
+      If the write touches W replicas and the read touches R replicas
+      and <span class="mono">R + W &gt; RF</span>, then any read’s
+      replica set must overlap with the write’s replica set in at
+      least one node — so the read is guaranteed to see the write.
+      That overlap is what “strong consistency” means in Cassandra.
+    </p>
+
+    <hr class="hr-double" />
+
+    <h2><span class="num">§ I.2</span>The rules to remember</h2>
+    <pre><code>walk            : clockwise, increasing token
+owner           : first vnode with token ≥ key's token
+replicas        : next RF distinct nodes, clockwise
+QUORUM(RF)      : floor(RF / 2) + 1
+strong consist. : R + W &gt; RF</code></pre>
+
+    <p style="margin-top: 36px;">
+      <a class="intext" href="./index.html">← back to the atlas</a>
+      &nbsp;·&nbsp;
+      <a class="intext" href="./kafka.html">next figure: a Kafka topic, partitioned →</a>
+    </p>
+
+    <footer class="colophon">
+      <span>© 2026 · Nils Matteson</span>
+      <span>Figure I · Cassandra</span>
+    </footer>
+
+  </main>
+
+  <script src="scripts/cassandra-ring.js"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HBase regions on a row line — CS 544 Visualizations</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <main class="page page--wide">
+
+    <header class="masthead">
+      <div>
+        <div class="masthead__meta">UW–Madison · CS 544 · spring 2026</div>
+        <div class="masthead__title"><a href="./index.html">Visualizing Distributed Data Systems</a></div>
+      </div>
+      <nav class="masthead__nav">
+        <a href="./cassandra.html">Cassandra</a>
+        <a href="./kafka.html">Kafka</a>
+        <a href="./hdfs.html">HDFS</a>
+        <a href="./hbase.html" class="is-current">HBase</a>
+      </nav>
+    </header>
+
+    <div class="eyebrow">Figure IV · Regions, splits, and RegionServers</div>
+    <h1 class="title">HBase regions, on a <em>row line</em>.</h1>
+    <p class="lede">
+      HBase keeps rows sorted by key and chops the keyspace into
+      contiguous regions. Each region lives on exactly one
+      RegionServer at a time. That single fact is what makes HBase
+      consistent — and what limits how it scales.
+    </p>
+
+    <p>
+      A region owns a contiguous range of row keys, like
+      <span class="mono">[d, j)</span>. When a region grows past a
+      threshold, it splits in half — two new regions, each owning
+      half the original keyspace. The cluster has a small set of
+      <strong>RegionServers</strong>, and the master assigns each
+      region to <em>exactly one</em>. If a RegionServer dies, its
+      regions are reassigned to other RegionServers.
+    </p>
+
+    <p>
+      Add rows below to fill regions. Hit <em>Split</em> to force a
+      split on the largest region. Kill a RegionServer to watch its
+      regions migrate. Notice that the row line — the keyspace —
+      never changes; only the partitioning of it does.
+    </p>
+
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure IV.1</span>
+        <span class="figure__title">A keyspace partitioned into regions, mapped to RegionServers</span>
+      </div>
+      <div class="figure__body" id="hbase-stage">
+        <svg id="hbase-svg" viewBox="0 0 920 420" role="img" aria-label="HBase regions on a row line">
+
+          <!-- row line label -->
+          <text x="40" y="60" class="label-sm">ROW KEY SPACE  ·  sorted lexicographically</text>
+
+          <!-- the row line itself -->
+          <line x1="40" y1="120" x2="880" y2="120" class="stroke-ink" stroke-width="2" />
+          <line x1="40" y1="115" x2="40" y2="125" class="stroke-ink" stroke-width="1" />
+          <line x1="880" y1="115" x2="880" y2="125" class="stroke-ink" stroke-width="1" />
+          <text x="40" y="108" text-anchor="middle" class="label-sm">a</text>
+          <text x="880" y="108" text-anchor="middle" class="label-sm">z</text>
+
+          <!-- regions (drawn by JS) -->
+          <g id="regions-g"></g>
+
+          <!-- RegionServers (drawn by JS) -->
+          <g id="rs-g"></g>
+
+          <!-- assignment lines (drawn by JS) -->
+          <g id="assign-g"></g>
+        </svg>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Add a row</span>
+          <input type="text" id="row-key" value="banana" maxlength="20"
+                 style="font-family: var(--mono); font-size: 13px; border: 1px solid var(--ink); background: var(--paper); padding: 6px 8px; border-radius: 0;" />
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="btn-add">Put →</button>
+            <button class="btn" id="btn-burst">Add 8 sample rows</button>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control__label">Region splits</span>
+          <button class="btn btn--accent" id="btn-split">Split largest region</button>
+        </div>
+        <div class="control">
+          <span class="control__label">Kill RegionServer</span>
+          <select id="kill-rs">
+            <option value="">— pick one —</option>
+            <option value="0">RS-1</option>
+            <option value="1">RS-2</option>
+            <option value="2">RS-3</option>
+          </select>
+        </div>
+      </div>
+
+      <figcaption class="figure__caption">
+        <b>Read this:</b> each colored bar above the line is a
+        region — a contiguous slice of the row keyspace, owning rows
+        between the two letters that bound it. Each region drops a
+        line down to the one RegionServer that owns it. A
+        RegionServer can own many regions; a region is owned by
+        exactly one RegionServer.
+      </figcaption>
+    </figure>
+
+    <div class="readout">
+      <div class="readout__cell">
+        <span class="k">Rows</span>
+        <span class="v" id="r-rows">0</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Regions</span>
+        <span class="v" id="r-regions">1</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Live RegionServers</span>
+        <span class="v" id="r-live">3</span>
+      </div>
+      <div class="readout__cell">
+        <span class="k">Last put landed in</span>
+        <span class="v" id="r-last">—</span>
+      </div>
+    </div>
+
+    <h2><span class="num">§ IV.1</span>What just happened</h2>
+
+    <h3>Rows are sorted by key, always</h3>
+    <p>
+      Every row in HBase has a row key, and the keyspace is sorted
+      lexicographically. <em>“apple”</em> comes before
+      <em>“banana”</em>, no matter when they were inserted. This
+      sortedness is what lets a region own a clean range; it’s also
+      why monotonically-increasing row keys (think:
+      <span class="mono">timestamp_…</span>) are a hot-spot risk —
+      every new write goes to the same trailing region.
+    </p>
+
+    <h3>One region → one RegionServer</h3>
+    <p>
+      This is the rule that makes HBase simple. A region is owned
+      by exactly one RegionServer at any moment — so all reads and
+      writes for that range of rows go through a single machine, and
+      they can be ordered, locked, and made consistent without
+      coordination. A region cannot live on two RegionServers at
+      once; if one dies, the master reassigns its regions before
+      letting reads or writes through.
+    </p>
+
+    <h3>Single-row transactions only</h3>
+    <p>
+      Because a region is owned by one RegionServer and a row lives
+      entirely in one region, HBase can offer ACID semantics across
+      the columns of a single row. It cannot offer them across rows
+      — even rows that happen to share a region — because users can
+      trigger a split at any moment.
+    </p>
+
+    <h3>Storage rides on HDFS</h3>
+    <p>
+      The actual HFiles for each region sit in HDFS. So HBase
+      inherits HDFS replication for free: the "region on one
+      RegionServer" rule is about <em>serving</em>, not about
+      durability. If a RegionServer dies, the data is still on HDFS,
+      and a different RegionServer can take over reading from it.
+    </p>
+
+    <h3>The cloud equivalent is Bigtable</h3>
+    <p>
+      Google’s Bigtable was the original; HBase is the open-source
+      reimplementation. The same row-sorted, region-on-one-server
+      design lives inside Cloud Bigtable, just with Colossus standing
+      in for HDFS.
+    </p>
+
+    <hr class="hr-double" />
+
+    <h2><span class="num">§ IV.2</span>The rules to remember</h2>
+    <pre><code>row order        : lexicographic by row key
+region           : contiguous slice of the keyspace
+ownership        : one region → one RegionServer (at a time)
+transactions     : single-row only
+storage          : HFiles on HDFS (so RF comes from HDFS)
+cloud equivalent : Bigtable (Colossus instead of HDFS)</code></pre>
+
+    <p style="margin-top: 36px;">
+      <a class="intext" href="./hdfs.html">← previous figure: HDFS, by the byte</a>
+      &nbsp;·&nbsp;
+      <a class="intext" href="./index.html">back to the atlas →</a>
+    </p>
+
+    <footer class="colophon">
+      <span>© 2026 · Nils Matteson</span>
+      <span>Figure IV · HBase</span>
+    </footer>
+
+  </main>
+
+  <script src="scripts/hbase-regions.js"></script>
+</body>
+</html>
