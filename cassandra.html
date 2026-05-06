@@ -30,6 +30,30 @@
       how many <em>more</em> places it should also live.
     </p>
 
+    <aside class="callout">
+      <span class="callout__label">Why this matters</span>
+      <h3 class="callout__title">Where you've already used Cassandra without knowing it</h3>
+      <div class="callout__body">
+        <p>
+          Cassandra was built at <strong>Facebook</strong> for Inbox
+          search and open-sourced in 2008. Today its largest production
+          installations are some of the busiest databases on the planet:
+        </p>
+        <ul class="callout__list">
+          <li><strong>Discord</strong> — 4 trillion messages, sharded by channel ID across the ring</li>
+          <li><strong>Netflix</strong> — every play, pause, and scrub goes into a Cassandra column</li>
+          <li><strong>Apple iCloud</strong> — billions of devices syncing to one of the biggest known clusters</li>
+          <li><strong>Instagram</strong> — feed, direct messages, fanout</li>
+        </ul>
+        <p style="margin-top:12px;">
+          <strong>The pattern:</strong> very high write volume from
+          many clients, geographic distribution out of the box,
+          eventual consistency is acceptable, and you would rather
+          stay up than be perfectly correct during a partition.
+        </p>
+      </div>
+    </aside>
+
     <p>
       A Cassandra cluster is laid out as a <strong>token ring</strong>.
       Each physical node owns a number of <strong>vnodes</strong>
@@ -62,7 +86,13 @@
           <g id="ring-g">
             <circle cx="360" cy="260" r="200" class="stroke-ink fill-paper" stroke-width="1.2" />
             <circle cx="360" cy="260" r="180" class="stroke-mute fill-paper" stroke-width="0.6" stroke-dasharray="2 4" />
-            <text x="360" y="50" text-anchor="middle" class="label-sm">TOKEN  0  ·  256</text>
+            <!-- center HUD -->
+            <text x="360" y="252" text-anchor="middle" class="label-sm" font-size="9">TOKEN SPACE</text>
+            <text x="360" y="270" text-anchor="middle" class="label-lg" font-size="20">[ 0, 256 )</text>
+            <text x="360" y="286" text-anchor="middle" class="label-sm" font-size="9">walk ↻ clockwise</text>
+            <!-- HUD: key hash, top-left of svg -->
+            <text x="14" y="22" class="label-sm" font-size="10">KEY HASH</text>
+            <text id="key-hud" x="14" y="44" class="label-lg" font-size="22">0</text>
           </g>
           <g id="ring-vnodes"></g>
           <g id="ring-arc"></g>
@@ -70,7 +100,6 @@
           <g id="ring-key">
             <line id="key-radial" x1="360" y1="260" x2="360" y2="40" stroke-width="1" stroke-dasharray="3 3" class="stroke-mute" />
             <circle id="key-handle" cx="360" cy="60" r="10" class="fill-ink" stroke="var(--paper)" stroke-width="2" style="cursor: grab;" />
-            <text id="key-label" x="360" y="28" text-anchor="middle" class="label-lg">key  hash = 0</text>
           </g>
         </svg>
       </div>

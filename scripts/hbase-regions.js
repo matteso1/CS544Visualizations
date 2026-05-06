@@ -319,5 +319,9 @@
 
   /* ---------- init -------------------------------------------------- */
 
+  ['apple', 'cherry', 'fig', 'mango', 'pear'].forEach(k => addRow(k));
+  splitLargest();
+  state.lastPut = null;
+
   renderAll();
 })();

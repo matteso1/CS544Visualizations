@@ -93,7 +93,7 @@
   const gReplicas = document.getElementById('ring-replicas');
   const keyHandle = document.getElementById('key-handle');
   const keyRadial = document.getElementById('key-radial');
-  const keyLabel  = document.getElementById('key-label');
+  const keyHUD    = document.getElementById('key-hud');
 
   const rfRange = document.getElementById('rf');
   const rfVal   = document.getElementById('rf-val');
@@ -123,27 +123,26 @@
 
     sorted.forEach((v, idx) => {
       const p = tokenToPos(v.token, RING_R);
-      const labelP = tokenToPos(v.token, RING_R + 30);
+      const labelP = tokenToPos(v.token, RING_R + 38);
       const fill = NODE_COLORS[v.node];
       const isActive = activeNodes.has(v.node);
       const isOwner  = idx === ownerIdx;
 
-      // halo ring for active replicas
+      // halo for active replicas
       if (isActive) {
         const halo = document.createElementNS(SVG_NS, 'circle');
         halo.setAttribute('cx', p.x);
         halo.setAttribute('cy', p.y);
-        halo.setAttribute('r', isOwner ? 18 : 15);
+        halo.setAttribute('r', isOwner ? 19 : 16);
         halo.setAttribute('fill', 'none');
         halo.setAttribute('stroke', '#8b1f0e');
-        halo.setAttribute('stroke-width', isOwner ? 2 : 1.2);
-        if (isOwner) halo.setAttribute('stroke-dasharray', '');
+        halo.setAttribute('stroke-width', isOwner ? 2.4 : 1.4);
         gVnodes.appendChild(halo);
       }
 
-      // vnode marker (square ↔ disambiguate from key dot)
+      // vnode square (filled w/ physical-node color)
       const sq = document.createElementNS(SVG_NS, 'rect');
-      const size = 18;
+      const size = 22;
       sq.setAttribute('x', p.x - size/2);
       sq.setAttribute('y', p.y - size/2);
       sq.setAttribute('width', size);
@@ -153,37 +152,27 @@
       sq.setAttribute('stroke-width', 1.5);
       gVnodes.appendChild(sq);
 
-      // node letter inside
+      // physical-node letter inside square
       const letter = document.createElementNS(SVG_NS, 'text');
       letter.setAttribute('x', p.x);
       letter.setAttribute('y', p.y + 4);
       letter.setAttribute('text-anchor', 'middle');
       letter.setAttribute('fill', '#f4f0e6');
       letter.setAttribute('font-family', 'JetBrains Mono, monospace');
-      letter.setAttribute('font-size', '11');
+      letter.setAttribute('font-size', '12');
       letter.setAttribute('font-weight', '600');
       letter.textContent = v.node;
       gVnodes.appendChild(letter);
 
-      // outside token label
-      const tokLabel = document.createElementNS(SVG_NS, 'text');
-      tokLabel.setAttribute('x', labelP.x);
-      tokLabel.setAttribute('y', labelP.y + 3);
-      tokLabel.setAttribute('text-anchor', 'middle');
-      tokLabel.setAttribute('class', 'label-sm');
-      tokLabel.textContent = `t${v.token}`;
-      gVnodes.appendChild(tokLabel);
-
-      // vnode index, small, between token and circle
-      const vidxP = tokenToPos(v.token, RING_R + 14);
-      const vidxLabel = document.createElementNS(SVG_NS, 'text');
-      vidxLabel.setAttribute('x', vidxP.x);
-      vidxLabel.setAttribute('y', vidxP.y + 3);
-      vidxLabel.setAttribute('text-anchor', 'middle');
-      vidxLabel.setAttribute('class', 'label-sm');
-      vidxLabel.setAttribute('font-size', '8');
-      vidxLabel.textContent = `v${idx + 1}`;
-      gVnodes.appendChild(vidxLabel);
+      // single combined outer label "v1 · t0"
+      const lbl = document.createElementNS(SVG_NS, 'text');
+      lbl.setAttribute('x', labelP.x);
+      lbl.setAttribute('y', labelP.y + 4);
+      lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('class', 'label-sm');
+      lbl.setAttribute('font-size', '10');
+      lbl.textContent = `v${idx + 1} · t${v.token}`;
+      gVnodes.appendChild(lbl);
     });
   }
 
@@ -217,15 +206,16 @@
   /* ---------- key handle render ------------------------------------ */
 
   function drawKey(token) {
-    const p = tokenToPos(token, RING_R);
-    const labelP = tokenToPos(token, RING_R + 56);
-    keyHandle.setAttribute('cx', p.x);
-    keyHandle.setAttribute('cy', p.y);
-    keyRadial.setAttribute('x2', p.x);
-    keyRadial.setAttribute('y2', p.y);
-    keyLabel.setAttribute('x', labelP.x);
-    keyLabel.setAttribute('y', labelP.y + 4);
-    keyLabel.textContent = `key  hash = ${token}`;
+    // dot sits on inner dotted ring, radial line continues to outer ring
+    // so it's visually clear which token the key occupies
+    const inner = tokenToPos(token, RING_R - 30);
+    const outer = tokenToPos(token, RING_R);
+    keyHandle.setAttribute('cx', inner.x);
+    keyHandle.setAttribute('cy', inner.y);
+    keyHandle.setAttribute('r', 7);
+    keyRadial.setAttribute('x2', outer.x);
+    keyRadial.setAttribute('y2', outer.y);
+    keyHUD.textContent = token;
   }
 
   /* ---------- main render ------------------------------------------ */

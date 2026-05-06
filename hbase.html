@@ -31,6 +31,33 @@
       consistent — and what limits how it scales.
     </p>
 
+    <aside class="callout">
+      <span class="callout__label">Why this matters</span>
+      <h3 class="callout__title">The database that powers things you'd never guess use a database</h3>
+      <div class="callout__body">
+        <p>
+          HBase is the open-source rebuild of Google's <strong>Bigtable</strong>
+          paper, and Bigtable is the table behind much of Google
+          itself. Where you find HBase or Bigtable, you find a
+          sparse, sorted, infinite key-value table:
+        </p>
+        <ul class="callout__list">
+          <li><strong>Facebook Messages</strong> — chat history rode on HBase for years</li>
+          <li><strong>The Wayback Machine</strong> — older snapshots of every webpage are stored region-by-region</li>
+          <li><strong>Google Search</strong> — the inverted index lives in Bigtable</li>
+          <li><strong>Gmail</strong> — every message, every label, every search index, in one giant Bigtable</li>
+          <li><strong>Spotify Cassandra → Bigtable migration</strong> — same workload, different cell of the CAP triangle</li>
+        </ul>
+        <p style="margin-top:12px;">
+          <strong>The pattern:</strong> billions of rows, billions of
+          columns, mostly empty cells, random reads and writes by
+          row key, and the need for strong per-row consistency. If
+          Cassandra is for "always available", HBase is for "always
+          right".
+        </p>
+      </div>
+    </aside>
+
     <p>
       A region owns a contiguous range of row keys, like
       <span class="mono">[d, j)</span>. When a region grows past a

@@ -31,6 +31,32 @@
       choice: <em>pipelining</em>.
     </p>
 
+    <aside class="callout">
+      <span class="callout__label">Why this matters</span>
+      <h3 class="callout__title">The filesystem that built the modern data lake</h3>
+      <div class="callout__body">
+        <p>
+          <strong>Yahoo</strong> built Hadoop and HDFS in 2006 to crawl
+          and index the web at petabyte scale, after reading Google's
+          GFS paper. HDFS — and its cloud descendants Colossus and
+          GCS — sit underneath nearly every large dataset you've ever
+          interacted with at one remove:
+        </p>
+        <ul class="callout__list">
+          <li><strong>Common Crawl</strong> — the web crawl that GPT, Claude, and every other LLM trained on lives in HDFS-like object storage</li>
+          <li><strong>Tesla Autopilot</strong> — the petabytes of dashcam video used to train self-driving</li>
+          <li><strong>Spotify</strong> — every play event, ever, archived for the recommendation engine</li>
+          <li><strong>The Internet Archive</strong> — every webpage snapshot since 1996</li>
+        </ul>
+        <p style="margin-top:12px;">
+          <strong>The pattern:</strong> write-once, read-many,
+          sequential access, very large files, on commodity disks.
+          You don't pick HDFS because it's fast at small operations —
+          you pick it because it never runs out of room.
+        </p>
+      </div>
+    </aside>
+
     <p>
       A naive design would have the client send the whole file
       <span class="mono">R</span> times — once to each replica. HDFS

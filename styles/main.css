@@ -425,6 +425,74 @@ select {
 .readout__cell .v--warn  { color: var(--ochre); }
 .readout__cell .v--bad   { color: var(--oxblood); }
 
+/* ==== callout (why this matters) ====================================== */
+
+.callout {
+  background: var(--paper-deep);
+  border-left: 3px solid var(--oxblood);
+  padding: 18px 24px 20px;
+  margin: 28px 0 40px;
+}
+
+.callout__label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.20em;
+  color: var(--oxblood);
+  margin-bottom: 10px;
+}
+
+.callout__title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1.35;
+  margin-bottom: 12px;
+  color: var(--ink);
+  border: 0;
+  padding: 0;
+}
+
+.callout__body {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.callout__body p { margin-bottom: 10px; max-width: none; }
+.callout__body p:last-child { margin-bottom: 0; }
+.callout__body strong { color: var(--ink); font-weight: 600; }
+
+.callout__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 24px;
+  margin-top: 8px;
+}
+.callout__list li {
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+  padding-left: 14px;
+  position: relative;
+}
+.callout__list li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--oxblood);
+  font-weight: 700;
+}
+.callout__list li strong { color: var(--ink); font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+
 /* ==== topic cards (landing) =========================================== */
 
 .cards {

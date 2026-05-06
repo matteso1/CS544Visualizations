@@ -30,6 +30,31 @@
       scales follows from that one decision.
     </p>
 
+    <aside class="callout">
+      <span class="callout__label">Why this matters</span>
+      <h3 class="callout__title">The bus that carries every modern data pipeline</h3>
+      <div class="callout__body">
+        <p>
+          <strong>LinkedIn</strong> built Kafka in 2010 because their
+          activity-feed ingest had outgrown every traditional message
+          queue. Today Kafka is the de-facto central nervous system
+          for most of the internet:
+        </p>
+        <ul class="callout__list">
+          <li><strong>Uber</strong> — every ride request, GPS ping, and surge price decision flows through Kafka</li>
+          <li><strong>Netflix</strong> — billions of events per day from every device watching</li>
+          <li><strong>The New York Times</strong> — every article, every edit, every day, archived back to 1851</li>
+          <li><strong>Pinterest</strong> — pin events drive the ML ranking pipelines downstream</li>
+        </ul>
+        <p style="margin-top:12px;">
+          <strong>The pattern:</strong> a durable log that decouples
+          producers from consumers, lets many independent
+          applications consume the same stream, and lets you replay
+          the past without coordinating with the writers.
+        </p>
+      </div>
+    </aside>
+
     <p>
       A topic is split into <strong>partitions</strong>. A producer
       sends a message; if the message has a key, Kafka picks the
