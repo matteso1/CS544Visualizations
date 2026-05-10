@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Cassandra ring — CS 544 Visualizations</title>
+  <title>The Cassandra ring, by the walk — CS 544 Visualizations</title>
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
@@ -22,12 +22,15 @@
       </nav>
     </header>
 
-    <div class="eyebrow">Figure I · Replication and the ring walk</div>
-    <h1 class="title">The Cassandra <em>ring</em>.</h1>
+    <div class="eyebrow">Figure I · Tokens, walks, replicas, quorums</div>
+    <h1 class="title">The Cassandra <em>ring</em>, by the walk.</h1>
     <p class="lede">
-      Every key in a Cassandra cluster lives in exactly one place — at
-      first. The ring decides where, and the replication factor decides
-      how many <em>more</em> places it should also live.
+      Cassandra is taught as a ring. It’s clearer as a line that
+      wraps. Below, the ring unrolls — and from there we follow a
+      single key all the way through: where it lands, where its
+      replicas live, what happens when machines die, and why
+      <span class="mono">R + W &gt; RF</span> is not the same as
+      strong consistency.
     </p>
 
     <aside class="callout">
@@ -54,170 +57,336 @@
       </div>
     </aside>
 
+    <!-- ====================================================== -->
+    <!-- § I.1   Ring → line                                     -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.1</span>The ring is just a line that wraps</h2>
     <p>
-      A Cassandra cluster is laid out as a <strong>token ring</strong>.
-      Each physical node owns a number of <strong>vnodes</strong>
-      (virtual nodes), and each vnode is assigned a <strong>token</strong> —
-      a point on the ring. When a row is written, its
-      <strong>partition key</strong> is hashed to produce a token, and
-      the row is sent to the first vnode whose token is greater than
-      or equal to the key’s token, walking <em>clockwise</em>. That
-      vnode’s node is the <strong>primary replica</strong>. The next
-      <span class="mono">RF − 1</span> distinct nodes clockwise hold
-      additional replicas.
+      Cassandra’s token space is a finite range of integers. Every
+      diagram draws it as a circle so that the largest token wraps
+      back to the smallest. The circle does one job: it makes the
+      wrap-around visible. Everything else is easier on a line.
     </p>
-
     <p>
-      Drag the dark mark around the ring below — or click anywhere on
-      the ring — to move the key. Watch the owner update. Change the
-      replication factor and watch the replica set grow or shrink.
-      Change the read and write consistency levels and watch the
-      <em>strong consistency</em> light come on or go off.
+      Press <em>Unwrap</em>. The ring rolls flat into a horizontal
+      number line, the four nodes slide into place, and from here
+      on out we’ll think of the token space as a line — with the
+      understanding that it wraps at the right end.
     </p>
 
     <figure class="figure">
       <div class="figure__head">
         <span class="figure__label">Figure I.1</span>
-        <span class="figure__title">A Cassandra ring with eight vnodes</span>
+        <span class="figure__title">From ring to row</span>
       </div>
-      <div class="figure__body" id="ring-stage">
-        <svg id="ring-svg" viewBox="0 0 720 520" role="img" aria-label="Cassandra ring with draggable key">
-          <!-- ring -->
-          <g id="ring-g">
-            <circle cx="360" cy="260" r="200" class="stroke-ink fill-paper" stroke-width="1.2" />
-            <circle cx="360" cy="260" r="180" class="stroke-mute fill-paper" stroke-width="0.6" stroke-dasharray="2 4" />
-            <!-- center HUD -->
-            <text x="360" y="252" text-anchor="middle" class="label-sm" font-size="9">TOKEN SPACE</text>
-            <text x="360" y="270" text-anchor="middle" class="label-lg" font-size="20">[ 0, 256 )</text>
-            <text x="360" y="286" text-anchor="middle" class="label-sm" font-size="9">walk ↻ clockwise</text>
-            <!-- HUD: key hash, top-left of svg -->
-            <text x="14" y="22" class="label-sm" font-size="10">KEY HASH</text>
-            <text id="key-hud" x="14" y="44" class="label-lg" font-size="22">0</text>
-          </g>
-          <g id="ring-vnodes"></g>
-          <g id="ring-arc"></g>
-          <g id="ring-replicas"></g>
-          <g id="ring-key">
-            <line id="key-radial" x1="360" y1="260" x2="360" y2="40" stroke-width="1" stroke-dasharray="3 3" class="stroke-mute" />
-            <circle id="key-handle" cx="360" cy="60" r="10" class="fill-ink" stroke="var(--paper)" stroke-width="2" style="cursor: grab;" />
-          </g>
-        </svg>
+      <div class="figure__body">
+        <svg id="svg-unwrap" viewBox="0 0 920 360" role="img" aria-label="Cassandra ring unwrapping into a number line"></svg>
       </div>
-
       <div class="controls">
         <div class="control">
-          <span class="control__label">Replication factor (RF)</span>
-          <input type="range" id="rf" min="1" max="5" value="3" />
-          <span class="control__value"><span id="rf-val">3</span> replica<span id="rf-s">s</span></span>
-        </div>
-        <div class="control">
-          <span class="control__label">Read CL (R)</span>
-          <select id="cl-r">
-            <option value="1">ONE (1)</option>
-            <option value="2" selected>QUORUM (auto)</option>
-            <option value="rf">ALL (RF)</option>
-          </select>
-        </div>
-        <div class="control">
-          <span class="control__label">Write CL (W)</span>
-          <select id="cl-w">
-            <option value="1">ONE (1)</option>
-            <option value="2" selected>QUORUM (auto)</option>
-            <option value="rf">ALL (RF)</option>
-          </select>
-        </div>
-        <div class="control">
-          <span class="control__label">Action</span>
-          <button class="btn btn--accent" id="btn-pulse">Pulse the walk →</button>
+          <span class="control__label">Show me</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-unwrap">Unwrap →</button>
+            <button class="btn" id="btn-rewrap">Re-wrap</button>
+          </div>
         </div>
       </div>
-
       <figcaption class="figure__caption">
-        <b>Read this:</b> the dark dot is the key. The shaded arc shows
-        the <em>walk</em> from the key’s position, clockwise, until it
-        meets the first vnode. That vnode is the <em>primary replica</em>.
-        The numbered vnodes that follow it are the
-        additional replicas; the count is the replication factor.
+        <b>Read this:</b> the four dots are the same four tokens
+        whether they sit on a circle or a line. The wrap arrow at
+        the right end is what we have to remember once we’re on
+        the line.
       </figcaption>
     </figure>
 
-    <div class="readout">
-      <div class="readout__cell">
-        <span class="k">Key token</span>
-        <span class="v" id="r-token">0</span>
-      </div>
-      <div class="readout__cell">
-        <span class="k">Owner vnode</span>
-        <span class="v" id="r-owner">v1@A</span>
-      </div>
-      <div class="readout__cell">
-        <span class="k">Replica nodes</span>
-        <span class="v" id="r-replicas">A · B · C</span>
-      </div>
-      <div class="readout__cell">
-        <span class="k">QUORUM</span>
-        <span class="v" id="r-quorum">2</span>
-      </div>
-      <div class="readout__cell">
-        <span class="k">R + W &gt; RF ?</span>
-        <span class="v v--ok" id="r-strong">strong</span>
-      </div>
-    </div>
-
-    <h2><span class="num">§ I.1</span>What just happened</h2>
+    <!-- ====================================================== -->
+    <!-- § I.2   Hash + walk                                     -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.2</span>From a row to a token to a node</h2>
     <p>
-      The cluster has <strong>four physical nodes</strong>
-      (<span class="mono">A, B, C, D</span>) and <strong>eight vnodes</strong>
-      arranged around the ring. When you drag the key, its
-      hash-token changes; the figure walks <em>clockwise</em> from that
-      token until it meets a vnode. The first <em>RF distinct nodes</em>
-      it touches — skipping additional vnodes that belong to a node it
-      has already counted — become the replica set.
+      A row’s <strong>partition key</strong> is hashed into one
+      number — its <strong>token</strong>. To find the row’s
+      <strong>owner</strong>, start at that token and walk
+      <em>right</em> along the line until you hit a node’s token.
+      If you fall off the right end, you wrap to the left and keep
+      walking.
+    </p>
+    <p>
+      Type a key below and press <em>Hash → walk</em>. Try
+      <span class="mono">user:42</span>, then <span class="mono">user:42</span>
+      again — same key always lands at the same token, with the
+      same owner. Try <span class="mono">zzz</span> to land near
+      the right end and watch the wrap.
     </p>
 
-    <h3>The walk is always clockwise</h3>
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.2</span>
+        <span class="figure__title">A key, hashed and walked</span>
+      </div>
+      <div class="figure__body">
+        <svg id="svg-walk" viewBox="0 0 920 260" role="img" aria-label="Hash a row key and walk to its owning node"></svg>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Row key</span>
+          <input type="text" id="walk-key" value="user:42" maxlength="20"
+                 style="font-family: var(--mono); font-size: 13px; border: 1px solid var(--ink); background: var(--paper); padding: 6px 8px; border-radius: 0;" />
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-walk-go">Hash → walk →</button>
+          </div>
+        </div>
+      </div>
+      <figcaption class="figure__caption">
+        <b>Read this:</b> the dark dot is where the key landed; the
+        arrow is the walk. If the walk has to fall off the right
+        end and reappear on the left, you’ll see it loop below the
+        line.
+      </figcaption>
+    </figure>
+
+    <!-- ====================================================== -->
+    <!-- § I.3   Vnodes + node join                              -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.3</span>Vnodes, and what happens when a node joins</h2>
     <p>
-      The single most common exam mistake is walking the wrong way. The
-      ring is ordered by increasing token, so the next vnode after a
-      key is always the one with the smallest token that is still
-      <em>≥</em> the key’s token. Walk counter-clockwise and you will
-      get a different owner every time.
+      With one token per node, adding a new node would mean handing
+      over half of one neighbor’s key range — a lot of data in one
+      place, and the load is wildly uneven. Cassandra fixes this
+      with <strong>vnodes</strong>: each physical node owns many
+      tokens scattered across the line. Adding a new node sprinkles
+      <em>its</em> vnodes into the gaps, and only the tiny segments
+      directly to the right of those new vnodes change owner.
+    </p>
+    <p>
+      Press <em>Add a node</em> below to drop a fifth node’s
+      vnodes into the line. Notice that most of the line keeps the
+      color it already had.
     </p>
 
-    <h3>Replicas count <em>distinct nodes</em>, not vnodes</h3>
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.3</span>
+        <span class="figure__title">A node joins the cluster</span>
+      </div>
+      <div class="figure__body">
+        <svg id="svg-vnode" viewBox="0 0 920 220" role="img" aria-label="Vnodes scattered along the line; adding a new node"></svg>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-add-node">Add a node →</button>
+            <button class="btn" id="btn-vnode-reset">Reset</button>
+          </div>
+        </div>
+      </div>
+      <figcaption class="figure__caption">
+        <b>Read this:</b> every vertical tick is a vnode, colored by
+        the physical node it belongs to. The shaded band underneath
+        shows which node owns each segment. Adding a new node only
+        changes the bands directly to the right of the new ticks.
+      </figcaption>
+    </figure>
+
+    <!-- ====================================================== -->
+    <!-- § I.4   Replication                                     -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.4</span>Replication: just keep walking</h2>
     <p>
-      If two adjacent vnodes belong to the same node, they count as one
-      replica. The walk simply continues past the duplicate. This is
-      why a cluster needs <span class="mono">RF</span> distinct
-      physical nodes to satisfy any RF; a 3-node cluster cannot
-      provide RF = 5.
+      A replication factor of <span class="mono">RF</span> means a
+      row is stored on <span class="mono">RF</span> distinct
+      <em>physical</em> nodes. The first owner is found by the walk
+      from § I.2. The next <span class="mono">RF − 1</span>
+      replicas are found by continuing the walk and picking each
+      new physical node we encounter. Vnodes that belong to a node
+      we’ve already counted are <em>skipped</em>.
     </p>
 
-    <h3>Quorum is a function of RF only</h3>
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.4</span>
+        <span class="figure__title">A key, replicated</span>
+      </div>
+      <div class="figure__body">
+        <svg id="svg-rep" viewBox="0 0 920 220" role="img" aria-label="Replication walk: pick the next RF distinct nodes"></svg>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Row key</span>
+          <input type="text" id="rep-key" value="user:42" maxlength="20"
+                 style="font-family: var(--mono); font-size: 13px; border: 1px solid var(--ink); background: var(--paper); padding: 6px 8px; border-radius: 0;" />
+        </div>
+        <div class="control">
+          <span class="control__label">RF</span>
+          <input type="range" id="rep-rf" min="1" max="4" value="3" />
+          <span class="control__value"><span id="rep-rf-val">3</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Action</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-rep-go">Hash → walk →</button>
+          </div>
+        </div>
+      </div>
+      <figcaption class="figure__caption">
+        <b>Read this:</b> the walk picks <span class="mono">RF</span>
+        <em>distinct</em> physical nodes (haloed). Vnodes whose
+        color we’ve already collected are <em>crossed out</em> —
+        they don’t count, and the walk continues past them.
+      </figcaption>
+    </figure>
+
+    <!-- ====================================================== -->
+    <!-- § I.5   Failure                                         -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.5</span>Failure: which rows go missing</h2>
     <p>
-      <span class="mono">QUORUM = ⌊RF ÷ 2⌋ + 1</span>. So for RF = 3,
-      quorum is 2; for RF = 5, quorum is 3; for RF = 6, quorum is 4
-      (a frequent trap — half of 6 is 3, but the quorum is one more
-      than half).
+      With <span class="mono">RF = 1</span>, every node is the
+      <em>only</em> home for some range of keys. Kill a node and
+      that whole range is gone. With <span class="mono">RF = 3</span>,
+      a row is stored on three distinct nodes, so one failure
+      loses nothing — you’d have to lose <em>every replica</em>
+      of a row for that row to be unreachable.
+    </p>
+    <p>
+      Tick the boxes below to kill nodes. Slide the RF slider and
+      watch the orange shading shrink: replication is what makes
+      data survive failures, and the walk’s skip-rule is what
+      makes replication actually use distinct machines.
     </p>
 
-    <h3>R + W &gt; RF means strong consistency</h3>
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.5</span>
+        <span class="figure__title">Failure domains: who has every replica?</span>
+      </div>
+      <div class="figure__body">
+        <svg id="svg-fail" viewBox="0 0 920 240" role="img" aria-label="Killing nodes; visualizing lost key ranges"></svg>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">RF</span>
+          <input type="range" id="fail-rf" min="1" max="4" value="1" />
+          <span class="control__value"><span id="fail-rf-val">1</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Kill nodes</span>
+          <div id="fail-kills" style="display:flex; gap:14px; flex-wrap:wrap;"></div>
+        </div>
+        <div class="control">
+          <span class="control__label">Keys lost</span>
+          <span class="control__value" id="fail-lost">0%</span>
+        </div>
+      </div>
+      <figcaption class="figure__caption">
+        <b>Read this:</b> tick a box to kill a node; the orange
+        shading marks every key whose <em>entire</em> replica set
+        is now dead. Bump RF up and the same kills affect less of
+        the line.
+      </figcaption>
+    </figure>
+
+    <!-- ====================================================== -->
+    <!-- § I.6   Quorums                                         -->
+    <!-- ====================================================== -->
+    <h2><span class="num">§ I.6</span>Quorums, and what they don’t promise</h2>
     <p>
-      If the write touches W replicas and the read touches R replicas
-      and <span class="mono">R + W &gt; RF</span>, then any read’s
-      replica set must overlap with the write’s replica set in at
-      least one node — so the read is guaranteed to see the write.
-      That overlap is what “strong consistency” means in Cassandra.
+      If a write reaches <span class="mono">W</span> replicas and a
+      read reaches <span class="mono">R</span> replicas, and
+      <span class="mono">R + W &gt; RF</span>, then the read’s
+      replica set <em>must</em> overlap the write’s replica set on
+      at least one node. The read can <em>see</em> the write, and
+      Cassandra’s last-write-wins picks the newer version. That’s
+      the <strong>read-your-write</strong> guarantee.
     </p>
+    <p>
+      It is <em>not</em> the same as strong consistency. If the
+      cluster was partitioned <em>during</em> the writes, replicas
+      can have legitimately diverged values — different writes on
+      different replicas — and the read still finds them and
+      silently picks one. Press <em>Run conflict scenario</em> to
+      walk through the canonical case (RF=2, W=1, R=2) and watch
+      it happen.
+    </p>
+
+    <figure class="figure">
+      <div class="figure__head">
+        <span class="figure__label">Figure I.6</span>
+        <span class="figure__title">A row, a quorum, a partition</span>
+      </div>
+      <div class="figure__body">
+        <svg id="svg-quorum" viewBox="0 0 920 380" role="img" aria-label="Two replicas, R/W quorums, conflict scenario"></svg>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">RF</span>
+          <span class="control__value">2 (fixed)</span>
+        </div>
+        <div class="control">
+          <span class="control__label">W</span>
+          <input type="range" id="q-w" min="1" max="2" value="1" />
+          <span class="control__value"><span id="q-w-val">1</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">R</span>
+          <input type="range" id="q-r" min="1" max="2" value="2" />
+          <span class="control__value"><span id="q-r-val">2</span></span>
+        </div>
+        <div class="control">
+          <span class="control__label">Replicas alive</span>
+          <div style="display:flex; gap:14px;">
+            <label style="display:flex; gap:6px; align-items:center;">
+              <input type="checkbox" id="q-alive-N1" checked />
+              <span class="control__value">N1</span>
+            </label>
+            <label style="display:flex; gap:6px; align-items:center;">
+              <input type="checkbox" id="q-alive-N2" checked />
+              <span class="control__value">N2</span>
+            </label>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control__label">Manual</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="btn-q-write-c0">Write col0++</button>
+            <button class="btn" id="btn-q-write-c1">Write col1++</button>
+            <button class="btn" id="btn-q-read">Read</button>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control__label">Auto</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--accent" id="btn-q-scenario">Run conflict scenario</button>
+            <button class="btn" id="btn-q-reset">Reset</button>
+          </div>
+        </div>
+      </div>
+      <figcaption class="figure__caption">
+        <b>Read this:</b> each replica is a small box holding the
+        current value of one row’s two columns. Writes try to reach
+        <span class="mono">W</span> live replicas; reads try to
+        reach <span class="mono">R</span>. The conflict scenario
+        plays out the textbook case: partitioned writes leave
+        replicas that disagree, and the merge is the only thing
+        that picks a winner.
+      </figcaption>
+    </figure>
 
     <hr class="hr-double" />
 
-    <h2><span class="num">§ I.2</span>The rules to remember</h2>
-    <pre><code>walk            : clockwise, increasing token
-owner           : first vnode with token ≥ key's token
-replicas        : next RF distinct nodes, clockwise
+    <h2><span class="num">§ I.7</span>The rules to remember</h2>
+    <pre><code>token space     : an integer range, drawn as a ring (it's a line that wraps)
+walk            : right (clockwise), wrapping at the right end
+owner           : first node-token ≥ key's token
+vnodes          : many tokens per physical node, for even balance
+replicas        : keep walking, pick the next RF distinct nodes
 QUORUM(RF)      : floor(RF / 2) + 1
-strong consist. : R + W &gt; RF</code></pre>
+R + W &gt; RF      : read-your-write guarantee (NOT strong consistency)
+under partition : replicas may diverge; LWW silently picks one</code></pre>
 
     <p style="margin-top: 36px;">
       <a class="intext" href="./index.html">← back to the atlas</a>
